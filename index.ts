@@ -312,7 +312,7 @@ if (ENABLE_HTTPS) {
 } else {
   const host = 'localhost';
   const port = 8000;
-  expectedOrigin = `https://evotingapi.onrender.com/`;
+  expectedOrigin = `https://evotingapi.onrender.com`;
 
   app.listen(port, () => {
     console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
