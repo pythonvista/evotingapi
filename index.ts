@@ -312,7 +312,7 @@ if (ENABLE_HTTPS) {
 } else {
   const host = 'localhost';
   const port = 8000;
-  expectedOrigin = `https://evotingclient.vercel.app`;
+  expectedOrigin = `https://evotingclient.vercel.app/fingerscanner`;
 
   app.listen(port, () => {
     console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
