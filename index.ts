@@ -41,7 +41,7 @@ import type {
 } from '@simplewebauthn/typescript-types';
 
 import { LoggedInUser } from './example-server';
-
+const cors = require('cors')
 const app = express();
 const MemoryStore = memoryStore(session);
 
@@ -67,6 +67,8 @@ app.use(
     }),
   }),
 );
+
+app.use(cors())
 
 /**
  * If the words "metadata statements" mean anything to you, you'll want to enable this route. It
