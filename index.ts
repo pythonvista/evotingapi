@@ -48,7 +48,7 @@ const MemoryStore = memoryStore(session);
 const {
   ENABLE_CONFORMANCE,
   ENABLE_HTTPS,
-  RP_ID = 'evotingapi.onrender.com',
+  RP_ID = 'https://evotingclient.vercel.app',
 } = process.env;
 
 app.use(express.static('./public/'));
@@ -293,7 +293,7 @@ app.post('/verify-authentication', async (req, res) => {
 if (ENABLE_HTTPS) {
   const host = '0.0.0.0';
   const port = 443;
-  expectedOrigin = `https://evotingapi.onrender.com/`;
+  expectedOrigin = `https://evotingclient.vercel.app`;
 
   https
     .createServer(
