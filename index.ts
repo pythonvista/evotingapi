@@ -48,7 +48,7 @@ const MemoryStore = memoryStore(session);
 const {
   ENABLE_CONFORMANCE,
   ENABLE_HTTPS,
-  RP_ID = 'localhost',
+  RP_ID = 'evotingapi.onrender.com',
 } = process.env;
 
 app.use(express.static('./public/'));
