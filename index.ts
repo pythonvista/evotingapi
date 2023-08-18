@@ -175,7 +175,7 @@ app.post('/verify-registration', async (req, res) => {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
       expectedOrigin: ['https://evotingapi.onrender.com', 'evotingclient.vercel.app'],
-      expectedRPID: ['evotingclient.vercel.app','evotingapi.onrender.com'],
+      expectedRPID: ['evotingclient.vercel.app','https://evotingapi.onrender.com'],
       requireUserVerification: true,
     };
     console.log('opts', opts)
