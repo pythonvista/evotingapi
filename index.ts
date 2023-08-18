@@ -126,7 +126,7 @@ app.get('/generate-registration-options', (req, res) => {
 
   const opts: GenerateRegistrationOptionsOpts = {
     rpName: 'SimpleWebAuthn Example',
-    rpID: ['evotingclient.vercel.app','evotingapi.onrender.com'],
+    rpID: `['evotingclient.vercel.app','evotingapi.onrender.com']`,
     userID: loggedInUserId,
     userName: username,
     timeout: 60000,
