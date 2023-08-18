@@ -164,11 +164,10 @@ app.get('/generate-registration-options', (req, res) => {
 
 app.post('/verify-registration', async (req, res) => {
   const body: RegistrationResponseJSON = req.body;
-  console.log('sessio to verify',req.session);
   console.log('body',body)
 
   const user = inMemoryUserDeviceDB[loggedInUserId];
-
+  console.log(user)
   const expectedChallenge = req.body.currentChallenge;
 
   let verification: VerifiedRegistrationResponse;
@@ -177,10 +176,11 @@ app.post('/verify-registration', async (req, res) => {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
       expectedOrigin,
-      expectedRPID: 'evotingclient.vercel.app',
+      expectedRPID: rpID,
       requireUserVerification: true,
     };
     verification = await verifyRegistrationResponse(opts);
+    console.log('opts', opts)
   } catch (error) {
     const _error = error as Error;
     console.error(_error);
