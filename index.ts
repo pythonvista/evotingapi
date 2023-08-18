@@ -176,7 +176,7 @@ app.post('/verify-registration', async (req, res) => {
       expectedChallenge: `${expectedChallenge}`,
       expectedOrigin,
       expectedRPID: rpID,
-      requireUserVerification: true,
+      requireUserVerification: false,
     };
     console.log('opts', opts)
     verification = await verifyRegistrationResponse(opts);
