@@ -177,7 +177,7 @@ app.post('/verify-registration', async (req, res) => {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
       expectedOrigin,
-      expectedRPID: rpID,
+      expectedRPID: 'https://evotingapi.onrender.com',
       requireUserVerification: true,
     };
     verification = await verifyRegistrationResponse(opts);
