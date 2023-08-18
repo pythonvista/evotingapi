@@ -169,7 +169,7 @@ app.post('/verify-registration', async (req, res) => {
 
   const user = inMemoryUserDeviceDB[loggedInUserId];
 
-  const expectedChallenge = req.session.currentChallenge;
+  const expectedChallenge = req.body.currentChallenge;
 
   let verification: VerifiedRegistrationResponse;
   try {
