@@ -90,7 +90,7 @@ export const rpID = RP_ID;
 // This value is set at the bottom of page as part of server initialization (the empty string is
 // to appease TypeScript until we determine the expected origin based on whether or not HTTPS
 // support is enabled)
-export let expectedOrigin = '';
+export let expectedOrigin = [];
 
 /**
  * 2FA and Passwordless WebAuthn flows expect you to be able to uniquely identify the user that
