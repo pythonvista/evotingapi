@@ -179,8 +179,9 @@ app.post('/verify-registration', async (req, res) => {
       expectedRPID: rpID,
       requireUserVerification: true,
     };
-    verification = await verifyRegistrationResponse(opts);
     console.log('opts', opts)
+    verification = await verifyRegistrationResponse(opts);
+    
   } catch (error) {
     const _error = error as Error;
     console.error(_error);
