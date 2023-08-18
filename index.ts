@@ -295,7 +295,7 @@ app.post('/verify-authentication', async (req, res) => {
 if (ENABLE_HTTPS) {
   const host = '0.0.0.0';
   const port = 443;
-  expectedOrigin = `https://evotingapi.onrender.com`;
+  expectedOrigin = ['https://evotingapi.onrender.com'];
 
   https
     .createServer(
