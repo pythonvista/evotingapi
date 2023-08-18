@@ -164,8 +164,8 @@ app.get('/generate-registration-options', (req, res) => {
 
 app.post('/verify-registration', async (req, res) => {
   const body: RegistrationResponseJSON = req.body;
-  console.log(req);
-  console.log(body)
+  console.log('sessio to verify',req.session);
+  console.log('body',body)
 
   const user = inMemoryUserDeviceDB[loggedInUserId];
 
