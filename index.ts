@@ -90,7 +90,7 @@ export const rpID = RP_ID;
 // This value is set at the bottom of page as part of server initialization (the empty string is
 // to appease TypeScript until we determine the expected origin based on whether or not HTTPS
 // support is enabled)
-export let expectedOrigin = [];
+export let expectedOrigin = '';
 
 /**
  * 2FA and Passwordless WebAuthn flows expect you to be able to uniquely identify the user that
@@ -174,9 +174,9 @@ app.post('/verify-registration', async (req, res) => {
     const opts: VerifyRegistrationResponseOpts = {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
-      expectedOrigin,
-      expectedRPID: rpID,
-      requireUserVerification: false,
+      expectedOrigin: ['https://evotingapi.onrender.com', 'evotingclient.vercel.app'],
+      expectedRPID: ['evotingclient.vercel.app','evotingapi.onrender.com'],
+      requireUserVerification: true,
     };
     console.log('opts', opts)
     verification = await verifyRegistrationResponse(opts);
@@ -295,7 +295,7 @@ app.post('/verify-authentication', async (req, res) => {
 if (ENABLE_HTTPS) {
   const host = '0.0.0.0';
   const port = 443;
-  expectedOrigin = ['https://evotingapi.onrender.com'];
+  expectedOrigin = `https://evotingapi.onrender.com`;
 
   https
     .createServer(
@@ -314,7 +314,7 @@ if (ENABLE_HTTPS) {
 } else {
   const host = 'localhost';
   const port = 8000;
-  expectedOrigin = ['https://evotingapi.onrender.com', 'evotingclient.vercel.app','https://evotingclient.vercel.app' ];
+  expectedOrigin = `https://evotingapi.onrender.com`;
 
   app.listen(port, () => {
     console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
