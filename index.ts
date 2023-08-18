@@ -293,7 +293,7 @@ app.post('/verify-authentication', async (req, res) => {
 if (ENABLE_HTTPS) {
   const host = '0.0.0.0';
   const port = 443;
-  expectedOrigin = `https://evotingclient.vercel.app`;
+  expectedOrigin = `evotingclient.vercel.app`;
 
   https
     .createServer(
@@ -312,7 +312,7 @@ if (ENABLE_HTTPS) {
 } else {
   const host = 'localhost';
   const port = 8000;
-  expectedOrigin = `https://evotingapi.onrender.com`;
+  expectedOrigin = `evotingclient.vercel.app`;
 
   app.listen(port, () => {
     console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
