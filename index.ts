@@ -48,7 +48,7 @@ const MemoryStore = memoryStore(session);
 const {
   ENABLE_CONFORMANCE,
   ENABLE_HTTPS,
-  RP_ID = 'https://evotingclient.vercel.app',
+  RP_ID = 'https://evotingapi.onrender.com',
 } = process.env;
 
 app.use(express.static('./public/'));
