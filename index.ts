@@ -237,7 +237,7 @@ app.get('/generate-authentication-options', (req, res) => {
    * The server needs to temporarily remember this value for verification, so don't lose it until
    * after you verify an authenticator response.
    */
-  req.session.currentChallenge = options.challenge;
+  req.body.currentChallenge = options.challenge;
 
   res.send(options);
 });
@@ -247,7 +247,7 @@ app.post('/verify-authentication', async (req, res) => {
 
   const user = inMemoryUserDeviceDB[loggedInUserId];
 
-  const expectedChallenge = req.session.currentChallenge;
+  const expectedChallenge = req.body.currentChallenge;
 
   let dbAuthenticator;
   const bodyCredIDBuffer = isoBase64URL.toBuffer(body.rawId);
