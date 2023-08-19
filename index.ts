@@ -268,8 +268,8 @@ app.post('/verify-authentication', async (req, res) => {
     const opts: VerifyAuthenticationResponseOpts = {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
-      expectedOrigin,
-      expectedRPID: rpID,
+      expectedOrigin: ['https://evotingapi.onrender.com', 'https://evotingclient.vercel.app'],
+      expectedRPID: ['evotingclient.vercel.app','https://evotingapi.onrender.com'],
       authenticator: dbAuthenticator,
       requireUserVerification: true,
     };
