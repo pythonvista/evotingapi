@@ -45,10 +45,11 @@ const cors = require('cors')
 const app = express();
 const MemoryStore = memoryStore(session);
 
+let clienturl = 'http://localhost:3000'
 const {
   ENABLE_CONFORMANCE,
   ENABLE_HTTPS,
-  RP_ID = 'evotingclient.vercel.app',
+  RP_ID = clienturl,
 } = process.env;
 
 app.use(express.static('./public/'));
@@ -174,8 +175,8 @@ app.post('/verify-registration', async (req, res) => {
     const opts: VerifyRegistrationResponseOpts = {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
-      expectedOrigin: ['https://evotingapi.onrender.com', 'https://evotingclient.vercel.app'],
-      expectedRPID: ['evotingclient.vercel.app','https://evotingapi.onrender.com'],
+      expectedOrigin: ['https://evotingapi.onrender.com', clienturl],
+      expectedRPID: [clienturl,'https://evotingapi.onrender.com'],
       requireUserVerification: true,
     };
     console.log('opts', opts)
@@ -268,8 +269,8 @@ app.post('/verify-authentication', async (req, res) => {
     const opts: VerifyAuthenticationResponseOpts = {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
-      expectedOrigin: ['https://evotingapi.onrender.com', 'https://evotingclient.vercel.app'],
-      expectedRPID: ['evotingclient.vercel.app','https://evotingapi.onrender.com'],
+      expectedOrigin: ['https://evotingapi.onrender.com',clienturl],
+      expectedRPID: [clienturl,'https://evotingapi.onrender.com'],
       authenticator: dbAuthenticator,
       requireUserVerification: true,
     };
