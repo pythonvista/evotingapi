@@ -45,7 +45,7 @@ const cors = require('cors')
 const app = express();
 const MemoryStore = memoryStore(session);
 
-let clienturl = 'http://localhost:3000'
+let clienturl = 'localhost:3000'
 const {
   ENABLE_CONFORMANCE,
   ENABLE_HTTPS,
