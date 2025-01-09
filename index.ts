@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
 /**
  * An example Express server showing off a simple integration of @simplewebauthn/server.
  *
@@ -17,39 +16,29 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import {
-  // Registration
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
+  AuthenticationResponseJSON,
   // Authentication
   generateAuthenticationOptions,
-  verifyAuthenticationResponse,
-} from '@simplewebauthn/server';
-import { isoBase64URL, isoUint8Array } from '@simplewebauthn/server/helpers';
-import type {
-  GenerateRegistrationOptionsOpts,
   GenerateAuthenticationOptionsOpts,
-  VerifyRegistrationResponseOpts,
-  VerifyAuthenticationResponseOpts,
-  VerifiedRegistrationResponse,
-  VerifiedAuthenticationResponse,
-} from '@simplewebauthn/server';
-
-import type {
+  // Registration
+  generateRegistrationOptions,
+  GenerateRegistrationOptionsOpts,
   RegistrationResponseJSON,
-  AuthenticationResponseJSON,
-  AuthenticatorDevice,
-} from '@simplewebauthn/typescript-types';
+  VerifiedAuthenticationResponse,
+  VerifiedRegistrationResponse,
+  verifyAuthenticationResponse,
+  VerifyAuthenticationResponseOpts,
+  verifyRegistrationResponse,
+  VerifyRegistrationResponseOpts,
+  WebAuthnCredential,
+} from '@simplewebauthn/server';
 
 import { LoggedInUser } from './example-server';
-const cors = require('cors')
+
 const app = express();
 const MemoryStore = memoryStore(session);
 
-const {
-  ENABLE_CONFORMANCE,
-  ENABLE_HTTPS,
-  RP_ID = 'evotingclient.vercel.app',
-} = process.env;
+const { ENABLE_CONFORMANCE, ENABLE_HTTPS, RP_ID = 'localhost' } = process.env;
 
 app.use(express.static('./public/'));
 app.use(express.json());
@@ -65,10 +54,8 @@ app.use(
     store: new MemoryStore({
       checkPeriod: 86_400_000, // prune expired entries every 24h
     }),
-  }),
+  })
 );
-
-app.use(cors())
 
 /**
  * If the words "metadata statements" mean anything to you, you'll want to enable this route. It
@@ -77,13 +64,15 @@ app.use(cors())
  * interact with the Rely Party (a.k.a. "RP", a.k.a. "this server").
  */
 if (ENABLE_CONFORMANCE === 'true') {
-  import('./fido-conformance').then(({ fidoRouteSuffix, fidoConformanceRouter }) => {
-    app.use(fidoRouteSuffix, fidoConformanceRouter);
-  });
+  import('./fido-conformance').then(
+    ({ fidoRouteSuffix, fidoConformanceRouter }) => {
+      app.use(fidoRouteSuffix, fidoConformanceRouter);
+    }
+  );
 }
 
 /**
- * RP ID represents the "scope" of websites on which a authenticator should be usable. The Origin
+ * RP ID represents the "scope" of websites on which a credential should be usable. The Origin
  * represents the expected URL from which registration or authentication occurs.
  */
 export const rpID = RP_ID;
@@ -96,54 +85,59 @@ export let expectedOrigin = '';
  * 2FA and Passwordless WebAuthn flows expect you to be able to uniquely identify the user that
  * performs registration or authentication. The user ID you specify here should be your internal,
  * _unique_ ID for that user (uuid, etc...). Avoid using identifying information here, like email
- * addresses, as it may be stored within the authenticator.
+ * addresses, as it may be stored within the credential.
  *
  * Here, the example server assumes the following user has completed login:
  */
 const loggedInUserId = 'internalUserId';
 
-const inMemoryUserDeviceDB: { [loggedInUserId: string]: LoggedInUser } = {
+const inMemoryUserDB: { [loggedInUserId: string]: LoggedInUser } = {
   [loggedInUserId]: {
     id: loggedInUserId,
     username: `user@${rpID}`,
-    devices: [],
+    credentials: [],
   },
 };
 
 /**
  * Registration (a.k.a. "Registration")
  */
-app.get('/generate-registration-options', (req, res) => {
-  const user = inMemoryUserDeviceDB[loggedInUserId];
+app.get('/generate-registration-options', async (req, res) => {
+  const user = inMemoryUserDB[loggedInUserId];
 
   const {
     /**
      * The username can be a human-readable name, email, etc... as it is intended only for display.
      */
     username,
-    devices,
+    credentials,
   } = user;
 
   const opts: GenerateRegistrationOptionsOpts = {
     rpName: 'SimpleWebAuthn Example',
     rpID,
-    userID: loggedInUserId,
     userName: username,
     timeout: 60000,
     attestationType: 'none',
     /**
-     * Passing in a user's list of already-registered authenticator IDs here prevents users from
-     * registering the same device multiple times. The authenticator will simply throw an error in
-     * the browser if it's asked to perform registration when one of these ID's already resides
-     * on it.
+     * Passing in a user's list of already-registered credential IDs here prevents users from
+     * registering the same authenticator multiple times. The authenticator will simply throw an
+     * error in the browser if it's asked to perform registration when it recognizes one of the
+     * credential ID's.
      */
-    excludeCredentials: devices.map(dev => ({
-      id: dev.credentialID,
+    excludeCredentials: credentials.map((cred) => ({
+      id: cred.id,
       type: 'public-key',
-      transports: dev.transports,
+      transports: cred.transports,
     })),
     authenticatorSelection: {
       residentKey: 'discouraged',
+      /**
+       * Wondering why user verification isn't required? See here:
+       *
+       * https://passkeys.dev/docs/use-cases/bootstrapping/#a-note-about-user-verification
+       */
+      userVerification: 'preferred',
     },
     /**
      * Support the two most common algorithms: ES256, and RS256
@@ -151,11 +145,11 @@ app.get('/generate-registration-options', (req, res) => {
     supportedAlgorithmIDs: [-7, -257],
   };
 
-  const options = generateRegistrationOptions(opts);
+  const options = await generateRegistrationOptions(opts);
 
   /**
    * The server needs to temporarily remember this value for verification, so don't lose it until
-   * after you verify an authenticator response.
+   * after you verify the registration response.
    */
   req.session.currentChallenge = options.challenge;
 
@@ -165,22 +159,26 @@ app.get('/generate-registration-options', (req, res) => {
 app.post('/verify-registration', async (req, res) => {
   const body: RegistrationResponseJSON = req.body;
 
+  const user = inMemoryUserDB[loggedInUserId];
 
-  const user = inMemoryUserDeviceDB[loggedInUserId];
-  const expectedChallenge = req.body.currentChallenge;
+  const expectedChallenge = req.session.currentChallenge;
 
   let verification: VerifiedRegistrationResponse;
   try {
     const opts: VerifyRegistrationResponseOpts = {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
-      expectedOrigin: ['https://evotingapi.onrender.com', 'https://evotingclient.vercel.app'],
-      expectedRPID: ['evotingclient.vercel.app','https://evotingapi.onrender.com'],
+      expectedOrigin: [
+        'https://evotingapi.onrender.com',
+        'https://evotingclient.vercel.app',
+      ],
+      expectedRPID: [
+        'evotingclient.vercel.app',
+        'https://evotingapi.onrender.com',
+      ],
       requireUserVerification: true,
     };
-    console.log('opts', opts)
     verification = await verifyRegistrationResponse(opts);
-    
   } catch (error) {
     const _error = error as Error;
     console.error(_error);
@@ -190,21 +188,23 @@ app.post('/verify-registration', async (req, res) => {
   const { verified, registrationInfo } = verification;
 
   if (verified && registrationInfo) {
-    const { credentialPublicKey, credentialID, counter } = registrationInfo;
+    const { credential } = registrationInfo;
 
-    const existingDevice = user.devices.find(device => isoUint8Array.areEqual(device.credentialID, credentialID));
+    const existingCredential = user.credentials.find(
+      (cred) => cred.id === credential.id
+    );
 
-    if (!existingDevice) {
+    if (!existingCredential) {
       /**
-       * Add the returned device to the user's list of devices
+       * Add the returned credential to the user's list of credentials
        */
-      const newDevice: AuthenticatorDevice = {
-        credentialPublicKey,
-        credentialID,
-        counter,
+      const newCredential: WebAuthnCredential = {
+        id: credential.id,
+        publicKey: credential.publicKey,
+        counter: credential.counter,
         transports: body.response.transports,
       };
-      user.devices.push(newDevice);
+      user.credentials.push(newCredential);
     }
   }
 
@@ -216,28 +216,33 @@ app.post('/verify-registration', async (req, res) => {
 /**
  * Login (a.k.a. "Authentication")
  */
-app.get('/generate-authentication-options', (req, res) => {
+app.get('/generate-authentication-options', async (req, res) => {
   // You need to know the user by this point
-  const user = inMemoryUserDeviceDB[loggedInUserId];
+  const user = inMemoryUserDB[loggedInUserId];
 
   const opts: GenerateAuthenticationOptionsOpts = {
     timeout: 60000,
-    allowCredentials: user.devices.map(dev => ({
-      id: dev.credentialID,
+    allowCredentials: user.credentials.map((cred) => ({
+      id: cred.id,
       type: 'public-key',
-      transports: dev.transports,
+      transports: cred.transports,
     })),
-    userVerification: 'required',
+    /**
+     * Wondering why user verification isn't required? See here:
+     *
+     * https://passkeys.dev/docs/use-cases/bootstrapping/#a-note-about-user-verification
+     */
+    userVerification: 'preferred',
     rpID,
   };
 
-  const options = generateAuthenticationOptions(opts);
+  const options = await generateAuthenticationOptions(opts);
 
   /**
    * The server needs to temporarily remember this value for verification, so don't lose it until
-   * after you verify an authenticator response.
+   * after you verify the authentication response.
    */
-  req.body.currentChallenge = options.challenge;
+  req.session.currentChallenge = options.challenge;
 
   res.send(options);
 });
@@ -245,22 +250,23 @@ app.get('/generate-authentication-options', (req, res) => {
 app.post('/verify-authentication', async (req, res) => {
   const body: AuthenticationResponseJSON = req.body;
 
-  const user = inMemoryUserDeviceDB[loggedInUserId];
+  const user = inMemoryUserDB[loggedInUserId];
 
-  const expectedChallenge = req.body.currentChallenge;
+  const expectedChallenge = req.session.currentChallenge;
 
-  let dbAuthenticator;
-  const bodyCredIDBuffer = isoBase64URL.toBuffer(body.rawId);
-  // "Query the DB" here for an authenticator matching `credentialID`
-  for (const dev of user.devices) {
-    if (isoUint8Array.areEqual(dev.credentialID, bodyCredIDBuffer)) {
-      dbAuthenticator = dev;
+  let dbCredential: WebAuthnCredential | undefined;
+  // "Query the DB" here for a credential matching `cred.id`
+  for (const cred of user.credentials) {
+    if (cred.id === body.id) {
+      dbCredential = cred;
       break;
     }
   }
 
-  if (!dbAuthenticator) {
-    return res.status(400).send({ error: 'Authenticator is not registered with this site' });
+  if (!dbCredential) {
+    return res.status(400).send({
+      error: 'Authenticator is not registered with this site',
+    });
   }
 
   let verification: VerifiedAuthenticationResponse;
@@ -268,10 +274,16 @@ app.post('/verify-authentication', async (req, res) => {
     const opts: VerifyAuthenticationResponseOpts = {
       response: body,
       expectedChallenge: `${expectedChallenge}`,
-      expectedOrigin: ['https://evotingapi.onrender.com', 'https://evotingclient.vercel.app'],
-      expectedRPID: ['evotingclient.vercel.app','https://evotingapi.onrender.com'],
-      authenticator: dbAuthenticator,
-      requireUserVerification: true,
+      expectedOrigin: [
+        'https://evotingapi.onrender.com',
+        'https://evotingclient.vercel.app',
+      ],
+      expectedRPID: [
+        'evotingclient.vercel.app',
+        'https://evotingapi.onrender.com',
+      ],
+      credential: dbCredential,
+      requireUserVerification: false,
     };
     verification = await verifyAuthenticationResponse(opts);
   } catch (error) {
@@ -283,8 +295,8 @@ app.post('/verify-authentication', async (req, res) => {
   const { verified, authenticationInfo } = verification;
 
   if (verified) {
-    // Update the authenticator's counter in the DB to the newest count in the authentication
-    dbAuthenticator.counter = authenticationInfo.newCounter;
+    // Update the credential's counter in the DB to the newest count in the authentication
+    dbCredential.counter = authenticationInfo.newCounter;
   }
 
   req.session.currentChallenge = undefined;
@@ -306,17 +318,17 @@ if (ENABLE_HTTPS) {
         key: fs.readFileSync(`./${rpID}.key`),
         cert: fs.readFileSync(`./${rpID}.crt`),
       },
-      app,
+      app
     )
-    .listen(port, () => {
+    .listen(port, host, () => {
       console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
     });
 } else {
-  const host = 'localhost';
+  const host = '127.0.0.1';
   const port = 8000;
   expectedOrigin = `https://evotingapi.onrender.com`;
 
-  app.listen(port, () => {
+  http.createServer(app).listen(port, host, () => {
     console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
   });
 }

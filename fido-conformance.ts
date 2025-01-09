@@ -1,24 +1,21 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
 import fs from 'fs';
 import express from 'express';
 import fetch from 'node-fetch';
 
 import {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
+  AuthenticationResponseJSON,
   generateAuthenticationOptions,
-  verifyAuthenticationResponse,
+  generateRegistrationOptions,
   MetadataService,
   MetadataStatement,
-  SettingsService,
-} from '@simplewebauthn/server';
-import { isoBase64URL, isoUint8Array } from '@simplewebauthn/server/helpers';
-import {
   RegistrationResponseJSON,
-  AuthenticationResponseJSON,
-} from '@simplewebauthn/typescript-types';
+  SettingsService,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse,
+} from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 
-import { rpID, expectedOrigin } from './index';
+import { expectedOrigin, rpID } from './index';
 import { LoggedInUser } from './example-server';
 
 interface LoggedInFIDOUser extends LoggedInUser {
@@ -46,7 +43,10 @@ try {
   const conformanceMetadataFilenames = fs.readdirSync(conformanceMetadataPath);
   for (const statementPath of conformanceMetadataFilenames) {
     if (statementPath.endsWith('.json')) {
-      const contents = fs.readFileSync(`${conformanceMetadataPath}/${statementPath}`, 'utf-8');
+      const contents = fs.readFileSync(
+        `${conformanceMetadataPath}/${statementPath}`,
+        'utf-8',
+      );
       statements.push(JSON.parse(contents));
     }
   }
@@ -64,8 +64,8 @@ fetch('https://mds3.fido.tools/getEndpoints', {
   body: JSON.stringify({ endpoint: `${expectedOrigin}${fidoRouteSuffix}` }),
   headers: { 'Content-Type': 'application/json' },
 })
-  .then(resp => resp.json())
-  .then(json => {
+  .then((resp) => resp.json())
+  .then((json) => {
     const mdsServers: string[] = json.result;
 
     return MetadataService.initialize({
@@ -79,62 +79,65 @@ fetch('https://mds3.fido.tools/getEndpoints', {
     console.log('🔐 FIDO Conformance routes ready');
   });
 
-const inMemoryUserDeviceDB: { [username: string]: LoggedInFIDOUser } = {
-  // [username]: string: {
-  //   id: loggedInUserId,
-  //   username: 'user@yourdomain.com',
-  //   devices: [
-  //     /**
-  //      * {
-  //      *   credentialID: string,
-  //      *   publicKey: string,
-  //      *   counter: number,
-  //      * }
-  //      */
-  //   ],
-  //   currentChallenge: undefined,
-  //   currentAuthenticationUserVerification: undefined,
-  // },
-};
+const inMemoryUserDB: { [username: string]: LoggedInFIDOUser } = {};
+
 // A cheap way of remembering who's "logged in" between the request for options and the response
 let loggedInUsername: string | undefined = undefined;
 
-const supportedAlgorithmIDs = [-7, -8, -35, -36, -37, -38, -39, -257, -258, -259, -65535];
+const supportedAlgorithmIDs = [
+  -7,
+  -8,
+  -35,
+  -36,
+  -37,
+  -38,
+  -39,
+  -257,
+  -258,
+  -259,
+  -65535,
+];
 
 /**
  * [FIDO2] Server Tests > MakeCredential Request
  */
-fidoConformanceRouter.post('/attestation/options', (req, res) => {
+fidoConformanceRouter.post('/attestation/options', async (req, res) => {
   const { body } = req;
-  const { username, displayName, authenticatorSelection, attestation, extensions } = body;
+  const {
+    username,
+    displayName,
+    authenticatorSelection,
+    attestation,
+    extensions,
+  } = body;
 
   loggedInUsername = username;
 
-  let user = inMemoryUserDeviceDB[username];
+  let user = inMemoryUserDB[username];
   if (!user) {
     const newUser = {
       id: username,
       username,
-      devices: [],
+      credentials: [],
     };
 
-    inMemoryUserDeviceDB[username] = newUser;
+    inMemoryUserDB[username] = newUser;
     user = newUser;
   }
 
-  const { devices } = user;
+  const { credentials } = user;
 
-  const opts = generateRegistrationOptions({
+  const opts = await generateRegistrationOptions({
     rpName,
     rpID,
-    userID: username,
+    userID: isoBase64URL.toBuffer(username),
     userName: username,
     userDisplayName: displayName,
     attestationType: attestation,
     authenticatorSelection,
     extensions,
-    excludeCredentials: devices.map(dev => ({
-      id: dev.credentialID,
+    excludeCredentials: credentials.map((cred) => ({
+      id: cred.id,
       type: 'public-key',
       transports: ['usb', 'ble', 'nfc', 'internal'],
     })),
@@ -159,7 +162,7 @@ fidoConformanceRouter.post('/attestation/options', (req, res) => {
 fidoConformanceRouter.post('/attestation/result', async (req, res) => {
   const body: RegistrationResponseJSON = req.body;
 
-  const user = inMemoryUserDeviceDB[`${loggedInUsername}`];
+  const user = inMemoryUserDB[`${loggedInUsername}`];
 
   const expectedChallenge = req.session.currentChallenge;
 
@@ -181,18 +184,18 @@ fidoConformanceRouter.post('/attestation/result', async (req, res) => {
   const { verified, registrationInfo } = verification;
 
   if (verified && registrationInfo) {
-    const { credentialPublicKey, credentialID, counter } = registrationInfo;
+    const { credential } = registrationInfo;
 
-    const existingDevice = user.devices.find(device => device.credentialID === credentialID);
+    const existingCredential = user.credentials.find((cred) => cred.id === credential.id);
 
-    if (!existingDevice) {
+    if (!existingCredential) {
       /**
-       * Add the returned device to the user's list of devices
+       * Add the returned credential to the user's list of credentials
        */
-      user.devices.push({
-        credentialPublicKey,
-        credentialID,
-        counter,
+      user.credentials.push({
+        id: credential.id,
+        publicKey: credential.publicKey,
+        counter: credential.counter,
       });
     }
   }
@@ -206,21 +209,22 @@ fidoConformanceRouter.post('/attestation/result', async (req, res) => {
 /**
  * [FIDO2] Server Tests > GetAuthentication Request
  */
-fidoConformanceRouter.post('/assertion/options', (req, res) => {
+fidoConformanceRouter.post('/assertion/options', async (req, res) => {
   const { body } = req;
   const { username, userVerification, extensions } = body;
 
   loggedInUsername = username;
 
-  const user = inMemoryUserDeviceDB[username];
+  const user = inMemoryUserDB[username];
 
-  const { devices } = user;
+  const { credentials } = user;
 
-  const opts = generateAuthenticationOptions({
+  const opts = await generateAuthenticationOptions({
+    rpID,
     extensions,
     userVerification,
-    allowCredentials: devices.map(dev => ({
-      id: dev.credentialID,
+    allowCredentials: credentials.map((cred) => ({
+      id: cred.id,
       type: 'public-key',
       transports: ['usb', 'ble', 'nfc', 'internal'],
     })),
@@ -240,7 +244,7 @@ fidoConformanceRouter.post('/assertion/result', async (req, res) => {
   const body: AuthenticationResponseJSON = req.body;
   const { id } = body;
 
-  const user = inMemoryUserDeviceDB[`${loggedInUsername}`];
+  const user = inMemoryUserDB[`${loggedInUsername}`];
 
   // Pull up values specified when generation authentication options
   const expectedChallenge = req.session.currentChallenge;
@@ -252,11 +256,10 @@ fidoConformanceRouter.post('/assertion/result', async (req, res) => {
     return res.status(400).send({ errorMessage: msg });
   }
 
-  const credIDBuffer = isoBase64URL.toBuffer(id);
-  const existingDevice = user.devices.find(device => isoUint8Array.areEqual(device.credentialID, credIDBuffer));
+  const existingCredential = user.credentials.find((cred) => cred.id === id);
 
-  if (!existingDevice) {
-    const msg = `Could not find device matching ${id}`;
+  if (!existingCredential) {
+    const msg = `Could not find credential matching ${id}`;
     console.error(`RP - authentication: ${msg}`);
     return res.status(400).send({ errorMessage: msg });
   }
@@ -268,7 +271,7 @@ fidoConformanceRouter.post('/assertion/result', async (req, res) => {
       expectedChallenge: `${expectedChallenge}`,
       expectedOrigin,
       expectedRPID: rpID,
-      authenticator: existingDevice,
+      credential: existingCredential,
       advancedFIDOConfig: { userVerification },
       requireUserVerification: false,
     });
@@ -281,7 +284,7 @@ fidoConformanceRouter.post('/assertion/result', async (req, res) => {
   const { verified, authenticationInfo } = verification;
 
   if (verified) {
-    existingDevice.counter = authenticationInfo.newCounter;
+    existingCredential.counter = authenticationInfo.newCounter;
   }
 
   return res.send({
@@ -330,8 +333,17 @@ X2S5Ht8+e+EQnezLJBJXtnkRWY+Zt491wgt/AwSs5PHHMv5QgjELOuMxQBc=
 `;
 
 // Set above root cert for use by MetadataService
-SettingsService.setRootCertificates({ identifier: 'mds', certificates: [MDS3ROOT] });
+SettingsService.setRootCertificates({
+  identifier: 'mds',
+  certificates: [MDS3ROOT],
+});
 // Reset preset root certificates
 SettingsService.setRootCertificates({ identifier: 'apple', certificates: [] });
-SettingsService.setRootCertificates({ identifier: 'android-key', certificates: [] });
-SettingsService.setRootCertificates({ identifier: 'android-safetynet', certificates: [] });
+SettingsService.setRootCertificates({
+  identifier: 'android-key',
+  certificates: [],
+});
+SettingsService.setRootCertificates({
+  identifier: 'android-safetynet',
+  certificates: [],
+});
