@@ -325,7 +325,7 @@ if (ENABLE_HTTPS) {
     });
 } else {
  const host = 'localhost';
-  const port = 8000;
+  const port = 10000;
   expectedOrigin = `https://evotingapi.onrender.com`;
 
   http.createServer(app).listen(port, host, () => {
