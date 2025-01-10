@@ -324,15 +324,15 @@ if (ENABLE_HTTPS) {
       },
       app
     )
-    .listen(443, 'localhost', () => {
+    .listen(443, '0.0.0.0', () => {
       console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
     });
 } else {
- const host = 'localhost';
-  const port = 8000;
+ const host = '0.0.0.0';
+  const port = 10000;
   expectedOrigin = `https://evotingapi.onrender.com`;
 
-  http.createServer(app).listen(3000, 'localhost', () => {
+  http.createServer(app).listen(10000, '0.0.0.0', () => {
     console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port}) yuu`);
   });
 }
