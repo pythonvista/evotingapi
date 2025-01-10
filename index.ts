@@ -34,7 +34,7 @@ import {
 } from '@simplewebauthn/server';
 
 import { LoggedInUser } from './example-server';
-
+const cors = require('cors');
 const app = express();
 const MemoryStore = memoryStore(session);
 
