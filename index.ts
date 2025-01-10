@@ -34,15 +34,11 @@ import {
 } from '@simplewebauthn/server';
 
 import { LoggedInUser } from './example-server';
-const cors = require('cors');
+
 const app = express();
 const MemoryStore = memoryStore(session);
 
-const {
-  ENABLE_CONFORMANCE,
-  ENABLE_HTTPS,
-  RP_ID = 'evotingclient.vercel.app',
-} = process.env;
+const { ENABLE_CONFORMANCE, ENABLE_HTTPS, RP_ID = 'localhost' } = process.env;
 
 app.use(express.static('./public/'));
 app.use(express.json());
@@ -60,7 +56,7 @@ app.use(
     }),
   })
 );
-app.use(cors());
+
 /**
  * If the words "metadata statements" mean anything to you, you'll want to enable this route. It
  * contains an example of a more complex deployment of SimpleWebAuthn with support enabled for the
@@ -311,7 +307,7 @@ app.post('/verify-authentication', async (req, res) => {
 if (ENABLE_HTTPS) {
   const host = '0.0.0.0';
   const port = 443;
-  expectedOrigin = `https://evotingapi.onrender.com`;
+    expectedOrigin = `https://evotingapi.onrender.com`;
 
   https
     .createServer(
