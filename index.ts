@@ -324,7 +324,7 @@ if (ENABLE_HTTPS) {
       },
       app
     )
-    .listen(8000, 'localhost', () => {
+    .listen(443, 'localhost', () => {
       console.log(`🚀 Server ready at ${expectedOrigin} (${host}:${port})`);
     });
 } else {
